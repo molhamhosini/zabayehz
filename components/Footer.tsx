@@ -1,13 +1,12 @@
 import Link from 'next/link';
 import type { ApiConfig } from '@/lib/types';
 import { CONTACT, telHref } from '@/lib/site';
-import { hasArabic, type Lang } from '@/lib/i18n';
+import type { Lang } from '@/lib/i18n';
 import { tools } from '@/lib/t';
 
 export function Footer({ lang, cfg, categories }: { lang: Lang; cfg: ApiConfig; categories: { id: number; name: string }[] }) {
   const { t, href } = tools(lang);
   const year = new Date().getFullYear();
-  const address = cfg.ecommerce_address && !(lang === 'en' && hasArabic(cfg.ecommerce_address)) ? cfg.ecommerce_address : null;
   return (
     <footer className="footer">
       <div className="wrap">
@@ -15,6 +14,7 @@ export function Footer({ lang, cfg, categories }: { lang: Lang; cfg: ApiConfig; 
           <div className="brand">
             <img src="/logo.png" alt={t.siteName} width={126} height={40} />
             <p>{t.footerAbout}</p>
+            <p className="company">{t.companyOf} <b>{t.company}</b></p>
           </div>
           <div>
             <h3>{t.categories}</h3>
@@ -25,7 +25,7 @@ export function Footer({ lang, cfg, categories }: { lang: Lang; cfg: ApiConfig; 
             <ul>
               {CONTACT.phones.map((n) => <li key={n}><a href={telHref(n)} className="num">{n}</a></li>)}
               <li><a href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a></li>
-              {address && <li>{address}</li>}
+              <li><address>{t.address}</address></li>
             </ul>
           </div>
           <div>
@@ -36,7 +36,7 @@ export function Footer({ lang, cfg, categories }: { lang: Lang; cfg: ApiConfig; 
             </div>
           </div>
         </div>
-        <div className="copy">{t.rights(year)}</div>
+        <div className="copy">{t.rights(year)} · {t.company}</div>
       </div>
     </footer>
   );

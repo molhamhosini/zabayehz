@@ -286,3 +286,6 @@ main { min-height: 60vh; }
 .result p { margin: 0; }
 .badge-ok, .badge-fail { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-size: 32px; color: #fff; font-weight: 700; background: var(--brand); }
 .badge-fail { background: var(--accent); }
+
+.footer .company { font-size: 13px; opacity: .85; margin-top: 8px; }
+.footer address { font-style: normal; }

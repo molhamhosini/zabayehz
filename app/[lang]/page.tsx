@@ -30,7 +30,8 @@ export default async function Home({ params }: { params: Promise<{ lang: string 
     name: t.siteName,
     url: `${SITE_URL}${href('/') === '/' ? '' : href('/')}`,
     image: `${SITE_URL}/logo.png`,
-    address: { '@type': 'PostalAddress', addressLocality: 'Abu Dhabi', addressCountry: 'AE' },
+    address: { '@type': 'PostalAddress', streetAddress: t.address, addressLocality: 'Abu Dhabi', addressCountry: 'AE' },
+    parentOrganization: { '@type': 'Organization', name: t.company, legalName: t.company },
   };
 
   return (
