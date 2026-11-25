@@ -16,11 +16,11 @@ const MOCK = process.env.MOCK_API === '1';
 const REVALIDATE = 120;
 
 // Only these categories are sold on the website; everything else (POS-only items) stays hidden.
-// Override with SHOP_CATEGORY_IDS="13,15,16,17" in the environment.
-// 13 ملحمة · 15 العروض · 16 الماعز · 17 الخروف
-export const SHOP_CATEGORIES = new Set(
-  (process.env.SHOP_CATEGORY_IDS || '13,15,16,17').split(',').map((x) => Number(x.trim())).filter(Number.isFinite),
-);
+// The list order is also the order categories appear on the site.
+// Override with SHOP_CATEGORY_IDS="17,16,15,13" in the environment.
+// 17 الخروف · 16 الماعز · 15 العروض · 13 ملحمة
+const SHOP_ORDER = (process.env.SHOP_CATEGORY_IDS || '17,16,15,13').split(',').map((x) => Number(x.trim())).filter(Number.isFinite);
+export const SHOP_CATEGORIES = new Set(SHOP_ORDER);
 
 /** True when the product belongs to at least one of the shop categories. */
 export function isShopProduct(p: Pick<ApiProduct, 'category_ids'>): boolean {
@@ -156,6 +156,7 @@ export async function getCategories(lang: Lang = 'ar') {
   const list = MOCK ? (await loadFixtures()).categories : await get<ApiCategory[]>('categories', 600, lang);
   return list
     .filter((c) => SHOP_CATEGORIES.has(Number(c.id)))
+    .sort((x, y) => SHOP_ORDER.indexOf(Number(x.id)) - SHOP_ORDER.indexOf(Number(y.id)))
     .map((c) => ({ id: c.id, name: categoryName(lang, c.id, c.name.trim()), image: joinUrl(cfg.base_urls.category_image_url, c.image) }));
 }
 
