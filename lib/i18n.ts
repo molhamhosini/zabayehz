@@ -223,7 +223,7 @@ const en: Dict = {
   contactUs: 'Contact us',
   getApp: 'Get the app',
   rights: (y: number) => `© ${y} Zabayeh Al Jazeera. All rights reserved.`,
-  company: 'Thimar Livestock & Sheep Trading L.L.C.',
+  company: 'Themar Livestock & Sheep Trading L.L.C.',
   companyOf: 'Zabayeh Al Jazeera is a brand of',
   address: 'Al Shamkha Automated Slaughterhouse, Old Al Shamkha, Al Shamkha, Abu Dhabi',
   whatsapp: 'Chat on WhatsApp',
