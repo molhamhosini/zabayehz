@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { CartButton } from './CartButton';
+import { AccountButton } from './AccountButton';
 import { PhoneIcon, SearchIcon } from './icons';
 import { CONTACT, telHref } from '@/lib/site';
 
@@ -39,6 +40,7 @@ export function Header({ categories, q }: Props) {
             <input id="q" name="q" type="search" placeholder="ابحث: خروف نعيمي، تيس، نصف ذبيحة…" defaultValue={q} enterKeyHint="search" />
             <button type="submit" aria-label="بحث"><SearchIcon size={18} /></button>
           </form>
+          <AccountButton />
           <CartButton />
         </div>
       </header>

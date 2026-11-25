@@ -188,6 +188,17 @@ export async function searchProducts(q: string, limit = 40): Promise<ProductCard
   return r.products.map((p) => toCard(p, cfg));
 }
 
+/** Raw product as the API returns it (used server-side to price orders). */
+export async function getProductRaw(id: number): Promise<ApiProduct | null> {
+  if (MOCK) return (await loadFixtures()).products.find((x) => x.id === id) ?? null;
+  try {
+    return await get<ApiProduct>(`products/details/${id}`, 60);
+  } catch (e) {
+    if (String(e).includes('-> 404')) return null;
+    throw e;
+  }
+}
+
 export async function getProduct(id: number): Promise<ProductDetail | null> {
   const cfg = await getConfig();
   if (MOCK) {

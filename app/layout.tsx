@@ -7,6 +7,7 @@ import '@fontsource/ibm-plex-sans-arabic/latin-400.css';
 import '@fontsource/ibm-plex-sans-arabic/latin-700.css';
 import './globals.css';
 import { CartProvider } from '@/components/CartProvider';
+import { UserProvider } from '@/components/UserProvider';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { getCategories, getConfig } from '@/lib/api';
@@ -30,6 +31,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="ar" dir="rtl">
       <body>
+        <UserProvider>
         <CartProvider>
           <Header categories={categories} />
           <main>{children}</main>
@@ -40,6 +42,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </a>
           )}
         </CartProvider>
+        </UserProvider>
       </body>
     </html>
   );

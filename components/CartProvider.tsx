@@ -9,6 +9,8 @@ export type CartLine = {
   unitPrice: number; // after discount
   qty: number;
   options: { title: string; value: string }[];
+  selections: Record<string, string>; // single-choice title -> option (used to place the order)
+  multi: Record<string, string[]>;
 };
 
 type Ctx = {
@@ -18,6 +20,7 @@ type Ctx = {
   add: (line: CartLine) => void;
   setQty: (key: string, qty: number) => void;
   remove: (key: string) => void;
+  clear: () => void;
   ready: boolean;
 };
 
@@ -31,7 +34,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORE);
-      if (raw) setLines(JSON.parse(raw));
+      // Lines saved before checkout existed have no selections; drop them.
+      if (raw) setLines((JSON.parse(raw) as CartLine[]).filter((l) => l && typeof l.selections === 'object'));
     } catch {}
     setReady(true);
   }, []);
@@ -54,12 +58,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, qty: Math.max(1, qty) } : l)));
   }, []);
   const remove = useCallback((key: string) => setLines((prev) => prev.filter((l) => l.key !== key)), []);
+  const clear = useCallback(() => setLines([]), []);
 
   const value = useMemo<Ctx>(() => ({
-    lines, ready, add, setQty, remove,
+    lines, ready, add, setQty, remove, clear,
     count: lines.reduce((s, l) => s + l.qty, 0),
     total: lines.reduce((s, l) => s + l.qty * l.unitPrice, 0),
-  }), [lines, ready, add, setQty, remove]);
+  }), [lines, ready, add, setQty, remove, clear]);
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }

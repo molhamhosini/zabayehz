@@ -50,11 +50,19 @@ export function ProductBuy({ p }: { p: ProductDetail }) {
   function addToCart() {
     if (missing >= 0 || soldOut) return;
     const options: { title: string; value: string }[] = [];
+    const selections: Record<string, string> = {};
+    const multiSel: Record<string, string[]> = {};
     p.choices.forEach((c, i) => {
       if (c.kind === 'multi') {
         const vals = [...multi[i]].sort().map((j) => c.options[j].label);
-        if (vals.length) options.push({ title: c.title, value: vals.join('، ') });
-      } else if (picked[i] !== null) options.push({ title: c.title, value: c.options[picked[i]!].label });
+        if (vals.length) {
+          options.push({ title: c.title, value: vals.join('، ') });
+          multiSel[c.title] = vals;
+        }
+      } else if (picked[i] !== null) {
+        options.push({ title: c.title, value: c.options[picked[i]!].label });
+        selections[c.title] = c.options[picked[i]!].label;
+      }
     });
     add({
       key: `${p.id}|${options.map((o) => o.value).join('|')}`,
@@ -64,6 +72,8 @@ export function ProductBuy({ p }: { p: ProductDetail }) {
       unitPrice: now,
       qty,
       options,
+      selections,
+      multi: multiSel,
     });
     setAdded(true);
   }

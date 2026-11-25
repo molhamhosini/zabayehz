@@ -37,7 +37,7 @@ export function CartView() {
       </div>
       <div className="cart-sum">
         <div className="line"><span>المجموع</span><span className="amt">{formatPrice(total)}</span></div>
-        <div className="notice">إتمام الطلب من الموقع قيد التجهيز (المرحلة الثانية). حاليًا يمكنك إكمال الطلب من تطبيق ذبائح الجزيرة.</div>
+        <Link href="/checkout" className="btn">إتمام الطلب</Link>
       </div>
     </>
   );
