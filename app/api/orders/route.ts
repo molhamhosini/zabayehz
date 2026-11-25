@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { badRequest, errorResponse, getLang } from '@/lib/backend';
-import { placeOrder, type OrderLineInput } from '@/lib/account';
+import { listOrders, placeOrder, type OrderLineInput } from '@/lib/account';
 
 export async function POST(req: Request) {
   try {
@@ -26,6 +26,14 @@ export async function POST(req: Request) {
       origin,
     });
     return NextResponse.json(r);
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
+
+export async function GET() {
+  try {
+    return NextResponse.json({ orders: await listOrders() });
   } catch (e) {
     return errorResponse(e);
   }

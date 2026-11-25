@@ -32,7 +32,7 @@ export async function getToken(): Promise<string | null> {
 
 export async function backend<T = unknown>(
   path: string,
-  init: { method?: string; body?: unknown; auth?: boolean } = {},
+  init: { method?: string; body?: unknown; form?: Record<string, string>; auth?: boolean } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
@@ -44,10 +44,19 @@ export async function backend<T = unknown>(
     if (!t) throw new BackendError(401, 'يرجى تسجيل الدخول أولًا');
     headers.Authorization = `Bearer ${t}`;
   }
+  let body: BodyInit | undefined;
+  if (init.form) {
+    // Multipart form, like the mobile app's profile update.
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(init.form)) fd.append(k, v);
+    body = fd;
+  } else if (init.body !== undefined) {
+    body = JSON.stringify(init.body);
+  }
   const res = await fetch(`${API}/api/v1/${path}`, {
-    method: init.method ?? (init.body !== undefined ? 'POST' : 'GET'),
+    method: init.method ?? (body !== undefined ? 'POST' : 'GET'),
     headers,
-    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+    body,
     cache: 'no-store',
   });
   const text = await res.text();

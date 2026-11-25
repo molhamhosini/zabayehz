@@ -1,7 +1,7 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-export type User = { id: number; name: string; phone: string } | null;
+export type User = { id: number; name: string; phone: string; fName?: string; lName?: string; email?: string } | null;
 type Ctx = { user: User; loading: boolean; refresh: () => Promise<void>; logout: () => Promise<void> };
 const UserContext = createContext<Ctx | null>(null);
 

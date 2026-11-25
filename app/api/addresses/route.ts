@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { badRequest, errorResponse, normalizePhone } from '@/lib/backend';
-import { addAddress, listAddresses } from '@/lib/account';
+import { addAddress, deleteAddress, listAddresses } from '@/lib/account';
 
 export async function GET() {
   try {
@@ -30,6 +30,17 @@ export async function POST(req: Request) {
       house: b.house ? String(b.house).slice(0, 40) : null,
       floor: b.floor ? String(b.floor).slice(0, 20) : null,
     });
+    return NextResponse.json({ addresses: await listAddresses() });
+  } catch (e) {
+    return errorResponse(e);
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const id = Number(new URL(req.url).searchParams.get('id'));
+    if (!Number.isInteger(id) || id <= 0) return badRequest('العنوان غير موجود');
+    await deleteAddress(id);
     return NextResponse.json({ addresses: await listAddresses() });
   } catch (e) {
     return errorResponse(e);

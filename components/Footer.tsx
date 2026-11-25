@@ -4,7 +4,7 @@ import { CONTACT, telHref } from '@/lib/site';
 import type { Lang } from '@/lib/i18n';
 import { tools } from '@/lib/t';
 
-export function Footer({ lang, cfg, categories }: { lang: Lang; cfg: ApiConfig; categories: { id: number; name: string }[] }) {
+export function Footer({ lang, cfg, categories, pages }: { lang: Lang; cfg: ApiConfig; categories: { id: number; name: string }[]; pages: string[] }) {
   const { t, href } = tools(lang);
   const year = new Date().getFullYear();
   return (
@@ -20,6 +20,12 @@ export function Footer({ lang, cfg, categories }: { lang: Lang; cfg: ApiConfig; 
             <h3>{t.categories}</h3>
             <ul>{categories.map((c) => <li key={c.id}><Link href={href(`/category/${c.id}`)}>{c.name}</Link></li>)}</ul>
           </div>
+          {pages.length > 0 && (
+            <div>
+              <h3>{t.infoLinks}</h3>
+              <ul>{pages.map((p) => <li key={p}><Link href={href(`/info/${p}`)}>{t.pages[p]}</Link></li>)}</ul>
+            </div>
+          )}
           <div>
             <h3>{t.contactUs}</h3>
             <ul>

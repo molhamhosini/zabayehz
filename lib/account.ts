@@ -21,7 +21,8 @@ export type Address = {
 export type Me = { id: number; f_name: string; l_name?: string | null; phone: string; email?: string | null };
 
 // ---------- mock ----------
-type MockDb = { otps: Map<string, string>; users: Map<string, Me>; tokens: Map<string, string>; addresses: Map<number, Address[]>; orders: number };
+type MockOrder = { userId: number; order: OrderView };
+type MockDb = { otps: Map<string, string>; users: Map<string, Me>; tokens: Map<string, string>; addresses: Map<number, Address[]>; orders: number; orderList?: MockOrder[] };
 const g = globalThis as unknown as { __zjMock?: MockDb };
 const db: MockDb = (g.__zjMock ??= { otps: new Map(), users: new Map(), tokens: new Map(), addresses: new Map(), orders: 100000 });
 
@@ -295,6 +296,20 @@ export async function placeOrder(input: PlaceOrderInput): Promise<{ orderId: str
 
   if (MOCK) {
     db.orders += 1;
+    const now = new Date().toISOString();
+    (db.orderList ??= []).push({
+      userId: me.id,
+      order: {
+        id: db.orders, status: 'pending', amount: subtotal + delivery, delivery, createdAt: now, deliveryDate: input.date,
+        payment: input.payment, paymentStatus: 'unpaid', itemCount: cart.reduce((n, c) => n + c.quantity, 0),
+        items: await Promise.all(cart.map(async (c) => {
+          const p = await getProductRaw(c.product_id);
+          return { name: p?.name ?? '', image: null, qty: c.quantity, unitPrice: c.discount_amount, options: Object.values(c.variation_selections) };
+        })),
+        address: { type: address.address_type, text: address.address, name: address.contact_person_name, phone: address.contact_person_number },
+        note: input.note ?? '', slot: null,
+      },
+    });
     return input.payment === 'cash_on_delivery'
       ? { orderId: String(db.orders) }
       : { orderId: String(db.orders), redirect: `${input.origin}/order/result?status=success&id=${db.orders}` };
@@ -308,4 +323,147 @@ export async function placeOrder(input: PlaceOrderInput): Promise<{ orderId: str
   const pay = await backend<{ redirect_link?: string }>('customer/payment-mobile', { auth: true, body: { ...body, order_id: orderId } });
   if (!pay.redirect_link) throw new BackendError(400, 'تعذّر فتح صفحة الدفع، يمكنك اختيار الدفع عند الاستلام');
   return { orderId, redirect: pay.redirect_link };
+}
+
+// ---------- account: profile ----------
+
+export async function updateProfile(input: { fName: string; lName: string; email: string }): Promise<void> {
+  const me = await getMe();
+  if (MOCK) { Object.assign(me, { f_name: input.fName, l_name: input.lName, email: input.email || null }); return; }
+  // Same fields the mobile app sends; an empty password keeps the current one.
+  await backend('customer/update-profile', {
+    auth: true,
+    form: { _method: 'put', f_name: input.fName, l_name: input.lName, email: input.email, phone: me.phone, password: '' },
+  });
+}
+
+/** Deletes the customer's account in the system (required by the app stores; same call as the app). */
+export async function removeAccount(): Promise<void> {
+  if (MOCK) {
+    const me = await mockUser();
+    db.users.delete(me.phone);
+    return;
+  }
+  await backend('customer/remove-account', { method: 'DELETE', auth: true });
+}
+
+export async function deleteAddress(id: number): Promise<void> {
+  if (MOCK) {
+    const u = await mockUser();
+    db.addresses.set(u.id, (db.addresses.get(u.id) ?? []).filter((a) => a.id !== id));
+    return;
+  }
+  await backend(`customer/address/delete?address_id=${id}`, { auth: true, body: { _method: 'delete' } });
+}
+
+// ---------- account: orders ----------
+
+export type OrderItem = { name: string; image: string | null; qty: number; unitPrice: number; options: string[] };
+export type OrderView = {
+  id: number;
+  status: string; // pending | confirmed | processing | out_for_delivery | delivered | returned | failed | canceled
+  amount: number;
+  delivery: number;
+  createdAt: string;
+  deliveryDate: string | null;
+  payment: string;
+  paymentStatus: string;
+  itemCount: number;
+  items?: OrderItem[];
+  address?: { type: string; text: string; name: string; phone: string } | null;
+  note?: string;
+  slot?: { from: string; to: string } | null;
+};
+
+type ApiOrder = {
+  id: number; order_status: string; order_amount: number; delivery_charge?: number; created_at: string;
+  delivery_date?: string | null; payment_method: string; payment_status: string; total_quantity?: number;
+  order_note?: string | null; time_slot?: { start_time?: string; end_time?: string } | null;
+  delivery_address?: { address_type?: string; address?: string; contact_person_name?: string; contact_person_number?: string } | null;
+  details_count?: number;
+};
+
+function toOrder(o: ApiOrder): OrderView {
+  return {
+    id: o.id,
+    status: o.order_status,
+    amount: Number(o.order_amount) || 0,
+    delivery: Number(o.delivery_charge) || 0,
+    createdAt: o.created_at,
+    deliveryDate: o.delivery_date ?? null,
+    payment: o.payment_method,
+    paymentStatus: o.payment_status,
+    itemCount: Number(o.total_quantity ?? o.details_count) || 0,
+    note: o.order_note ?? '',
+    slot: o.time_slot?.start_time ? { from: o.time_slot.start_time, to: o.time_slot.end_time ?? '' } : null,
+    address: o.delivery_address
+      ? {
+          type: o.delivery_address.address_type ?? '',
+          text: o.delivery_address.address ?? '',
+          name: o.delivery_address.contact_person_name ?? '',
+          phone: o.delivery_address.contact_person_number ?? '',
+        }
+      : null,
+  };
+}
+
+export async function listOrders(): Promise<OrderView[]> {
+  if (MOCK) {
+    const me = await mockUser();
+    return (db.orderList ?? []).filter((o) => o.userId === me.id).map((o) => o.order).reverse();
+  }
+  const r = await backend<ApiOrder[] | { orders?: ApiOrder[] }>('customer/order/list', { auth: true });
+  const list = Array.isArray(r) ? r : r.orders ?? [];
+  return list.map(toOrder).sort((a, b) => b.id - a.id);
+}
+
+type ApiOrderLine = {
+  price: number; discount_on_product?: number; quantity: number;
+  product_details?: { name?: string; image?: string | string[] } | string | null;
+  formatted_variation?: Record<string, unknown> | null;
+  variation?: unknown;
+};
+
+export async function getOrder(id: number): Promise<OrderView> {
+  if (MOCK) {
+    const me = await mockUser();
+    const o = (db.orderList ?? []).find((x) => x.userId === me.id && x.order.id === id);
+    if (!o) throw new BackendError(404, 'الطلب غير موجود');
+    return o.order;
+  }
+  const cfg = await getConfig();
+  const [track, lines] = await Promise.all([
+    backend<ApiOrder>('customer/order/track', { auth: true, body: { order_id: id } }),
+    backend<ApiOrderLine[]>('customer/order/details', { auth: true, body: { order_id: id } }),
+  ]);
+  const order = toOrder(track);
+  const imgBase = cfg.base_urls.product_image_url.replace(/\/$/, '');
+  order.items = (lines ?? []).map((l) => {
+    const pd = typeof l.product_details === 'string' ? safeJson(l.product_details) : l.product_details;
+    const img = Array.isArray(pd?.image) ? pd?.image[0] : pd?.image;
+    const fv = l.formatted_variation && typeof l.formatted_variation === 'object' ? l.formatted_variation : {};
+    return {
+      name: String(pd?.name ?? '').trim(),
+      image: img ? (/^https?:/.test(img) ? img : `${imgBase}/${img}`) : null,
+      qty: Number(l.quantity) || 1,
+      unitPrice: Math.max(0, (Number(l.price) || 0) - (Number(l.discount_on_product) || 0)),
+      options: Object.values(fv).map((v) => String(v).trim()).filter(Boolean),
+    };
+  });
+  order.itemCount = order.items.reduce((n, i) => n + i.qty, 0);
+  return order;
+}
+
+function safeJson(s: string): { name?: string; image?: string | string[] } | null {
+  try { return JSON.parse(s); } catch { return null; }
+}
+
+export async function cancelOrder(id: number): Promise<void> {
+  if (MOCK) {
+    const o = await getOrder(id);
+    if (o.status !== 'pending') throw new BackendError(400, 'لا يمكن إلغاء الطلب بعد تأكيده');
+    o.status = 'canceled';
+    return;
+  }
+  await backend('customer/order/cancel', { auth: true, body: { order_id: id, _method: 'put' } });
 }

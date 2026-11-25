@@ -14,7 +14,7 @@ import { UserProvider } from '@/components/UserProvider';
 import { LangProvider } from '@/components/LangProvider';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
-import { getCategories, getConfig } from '@/lib/api';
+import { getCategories, getConfig, getInfoPageSlugs } from '@/lib/api';
 import { alternates, dictOf, dirOf, isLang, LANGS } from '@/lib/i18n';
 import { SITE_URL } from '@/lib/site';
 import { WhatsIcon } from '@/components/icons';
@@ -44,7 +44,7 @@ export const viewport: Viewport = { themeColor: '#1d5a33', width: 'device-width'
 export default async function RootLayout({ children, params }: Props) {
   const { lang } = await params;
   if (!isLang(lang)) notFound();
-  const [cfg, categories] = await Promise.all([getConfig(), getCategories(lang)]);
+  const [cfg, categories, pages] = await Promise.all([getConfig(), getCategories(lang), getInfoPageSlugs(lang).catch(() => [])]);
   const wa = String(cfg.whatsapp?.status) === '1' && cfg.whatsapp?.number ? cfg.whatsapp.number.replace(/\D/g, '') : null;
   return (
     <html lang={lang} dir={dirOf(lang)}>
@@ -54,7 +54,7 @@ export default async function RootLayout({ children, params }: Props) {
         <CartProvider>
           <Header lang={lang} categories={categories} />
           <main>{children}</main>
-          <Footer lang={lang} cfg={cfg} categories={categories} />
+          <Footer lang={lang} cfg={cfg} categories={categories} pages={pages} />
           {wa && (
             <a className="wa-float" href={`https://wa.me/${wa}`} target="_blank" rel="noopener" aria-label={dictOf(lang).whatsapp}>
               <WhatsIcon />

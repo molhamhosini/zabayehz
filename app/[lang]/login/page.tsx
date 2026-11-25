@@ -11,7 +11,8 @@ function Inner() {
   const next = useSearchParams().get('next');
   const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : href('/');
   const { user, loading, logout } = useUser();
-  useEffect(() => { if (!loading && user && next) router.replace(safeNext); }, [loading, user, next, safeNext, router]);
+  // Signed-in customers go back where they came from, or to their account.
+  useEffect(() => { if (!loading && user) router.replace(next ? safeNext : href('/account')); }, [loading, user, next, safeNext, router, href]);
   useEffect(() => { document.title = `${user ? t.myAccount : t.signIn} | ${t.siteName}`; }, [user, t]);
   return (
     <div className="wrap narrow">
@@ -24,7 +25,7 @@ function Inner() {
             <button className="btn secondary" onClick={logout}>{t.logout}</button>
           </>
         ) : (
-          <LoginForm onDone={() => router.replace(safeNext)} />
+          <LoginForm onDone={() => router.replace(next ? safeNext : href('/account'))} />
         )}
       </div>
     </div>

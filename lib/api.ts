@@ -251,3 +251,49 @@ export async function getAllProductIds(): Promise<number[]> {
   const r = await get<{ products: ApiProduct[] }>('products/latest?limit=200&offset=1', 3600);
   return r.products.filter(isShopProduct).map((p) => p.id);
 }
+
+// ---------- information pages (about us, policies) ----------
+// The admin panel stores these as HTML inside the config, e.g. privacy_policy = {"description": "<p>…</p>", "background_image": …}.
+
+export const PAGE_FIELDS: Record<string, { field: string; status?: string }> = {
+  'about-us': { field: 'about_us' },
+  'terms-and-conditions': { field: 'terms_and_conditions' },
+  'privacy-policy': { field: 'privacy_policy' },
+  'refund-policy': { field: 'refund_policy', status: 'refund_policy_status' },
+  'cancellation-policy': { field: 'cancellation_policy', status: 'cancellation_policy_status' },
+  'return-policy': { field: 'return_policy', status: 'return_policy_status' },
+};
+
+/** Removes anything that could run code; the rest of the admin's formatting is kept. */
+function sanitizeHtml(html: string): string {
+  return html
+    .replace(/<(script|style|iframe|object|embed|form|textarea|select|noscript|template)\b[\s\S]*?<\/\1\s*>/gi, '')
+    .replace(/<\/?(script|style|iframe|object|embed|form|input|button|textarea|select|link|meta|base|noscript|template)\b[^>]*>/gi, '')
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/\s(href|src)\s*=\s*("|')\s*(javascript|data|vbscript):[^"']*\2/gi, '')
+    .replace(/\sstyle\s*=\s*("[^"]*"|'[^']*')/gi, '');
+}
+
+export async function getInfoPage(slug: string, lang: Lang = 'ar'): Promise<{ html: string; image: string | null } | null> {
+  const spec = PAGE_FIELDS[slug];
+  if (!spec) return null;
+  const cfg = (MOCK ? await getConfig() : await get<ApiConfig>('config', 600, lang)) as unknown as Record<string, unknown> & ApiConfig;
+  if (spec.status && cfg[spec.status] !== undefined && !['1', 'true'].includes(String(cfg[spec.status]))) return null;
+  let raw = cfg[spec.field];
+  if (typeof raw === 'string') {
+    try { raw = JSON.parse(raw); } catch { /* plain HTML */ }
+  }
+  const obj: { description?: string; background_image_url?: string | null } =
+    raw && typeof raw === 'object' ? (raw as object) : { description: typeof raw === 'string' ? raw : '' };
+  const html = sanitizeHtml(String(obj.description ?? '')).trim();
+  if (!html || html === 'null' || !html.replace(/<[^>]+>|&nbsp;|\s/g, '')) return null;
+  const image = obj.background_image_url && /^https:\/\//.test(obj.background_image_url) ? obj.background_image_url : null;
+  return { html, image };
+}
+
+/** Pages that have content, for footer links. */
+export async function getInfoPageSlugs(lang: Lang = 'ar'): Promise<string[]> {
+  const out: string[] = [];
+  for (const slug of Object.keys(PAGE_FIELDS)) if (await getInfoPage(slug, lang).catch(() => null)) out.push(slug);
+  return out;
+}
