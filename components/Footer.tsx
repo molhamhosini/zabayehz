@@ -1,38 +1,42 @@
 import Link from 'next/link';
 import type { ApiConfig } from '@/lib/types';
 import { CONTACT, telHref } from '@/lib/site';
+import { hasArabic, type Lang } from '@/lib/i18n';
+import { tools } from '@/lib/t';
 
-export function Footer({ cfg, categories }: { cfg: ApiConfig; categories: { id: number; name: string }[] }) {
+export function Footer({ lang, cfg, categories }: { lang: Lang; cfg: ApiConfig; categories: { id: number; name: string }[] }) {
+  const { t, href } = tools(lang);
   const year = new Date().getFullYear();
+  const address = cfg.ecommerce_address && !(lang === 'en' && hasArabic(cfg.ecommerce_address)) ? cfg.ecommerce_address : null;
   return (
     <footer className="footer">
       <div className="wrap">
         <div className="cols">
           <div className="brand">
-            <img src="/logo.png" alt="ذبائح الجزيرة" width={126} height={40} />
-            <p>ذبائح طازجة من مزارعنا، تُذبح يوميًا وفق الشريعة الإسلامية وتصلك مبرّدة إلى باب البيت.</p>
+            <img src="/logo.png" alt={t.siteName} width={126} height={40} />
+            <p>{t.footerAbout}</p>
           </div>
           <div>
-            <h3>الأقسام</h3>
-            <ul>{categories.map((c) => <li key={c.id}><Link href={`/category/${c.id}`}>{c.name}</Link></li>)}</ul>
+            <h3>{t.categories}</h3>
+            <ul>{categories.map((c) => <li key={c.id}><Link href={href(`/category/${c.id}`)}>{c.name}</Link></li>)}</ul>
           </div>
           <div>
-            <h3>تواصل معنا</h3>
+            <h3>{t.contactUs}</h3>
             <ul>
               {CONTACT.phones.map((n) => <li key={n}><a href={telHref(n)} className="num">{n}</a></li>)}
               <li><a href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a></li>
-              {cfg.ecommerce_address && <li>{cfg.ecommerce_address}</li>}
+              {address && <li>{address}</li>}
             </ul>
           </div>
           <div>
-            <h3>حمّل التطبيق</h3>
+            <h3>{t.getApp}</h3>
             <div className="stores">
               {cfg.play_store_config?.status && <a href={cfg.play_store_config.link} rel="noopener" target="_blank">Google Play</a>}
               {cfg.app_store_config?.status && <a href={cfg.app_store_config.link} rel="noopener" target="_blank">App Store</a>}
             </div>
           </div>
         </div>
-        <div className="copy">© {year} ذبائح الجزيرة. جميع الحقوق محفوظة.</div>
+        <div className="copy">{t.rights(year)}</div>
       </div>
     </footer>
   );

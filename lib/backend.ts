@@ -2,6 +2,7 @@
 // The token lives in an httpOnly cookie, so it never reaches page JavaScript.
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { isLang, LANG_COOKIE, serverMsg, type Lang } from './i18n';
 
 export const API = (process.env.API_BASE_URL || 'https://poszabayeh.com').replace(/\/$/, '');
 export const MOCK = process.env.MOCK_API === '1';
@@ -19,6 +20,12 @@ function messageOf(body: unknown, fallback: string): string {
   return b?.errors?.[0]?.message || b?.message || fallback;
 }
 
+/** The visitor's language, set by middleware.ts when a page is opened. */
+export async function getLang(): Promise<Lang> {
+  const v = (await cookies()).get(LANG_COOKIE)?.value;
+  return isLang(v) ? v : 'ar';
+}
+
 export async function getToken(): Promise<string | null> {
   return (await cookies()).get(TOKEN_COOKIE)?.value ?? null;
 }
@@ -29,7 +36,7 @@ export async function backend<T = unknown>(
 ): Promise<T> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
-    'X-localization': 'ar',
+    'X-localization': await getLang(),
   };
   if (init.body !== undefined) headers['Content-Type'] = 'application/json';
   if (init.auth) {
@@ -61,14 +68,20 @@ export function setTokenCookie(res: NextResponse, token: string) {
 }
 
 /** Turns any thrown error into a JSON error response for route handlers. */
-export function errorResponse(e: unknown) {
+export async function errorResponse(e: unknown) {
+  const lang = await getLang();
   if (e instanceof BackendError) {
-    const res = NextResponse.json({ error: e.message }, { status: e.status === 401 ? 401 : 400 });
+    const res = NextResponse.json({ error: serverMsg(lang, e.message) }, { status: e.status === 401 ? 401 : 400 });
     if (e.status === 401) res.cookies.delete(TOKEN_COOKIE);
     return res;
   }
   console.error(e);
-  return NextResponse.json({ error: 'حدث خطأ غير متوقع، حاول مرة أخرى' }, { status: 500 });
+  return NextResponse.json({ error: serverMsg(lang, 'حدث خطأ غير متوقع، حاول مرة أخرى') }, { status: 500 });
+}
+
+/** 400 response with a message in the visitor's language. */
+export async function badRequest(msg: string) {
+  return NextResponse.json({ error: serverMsg(await getLang(), msg) }, { status: 400 });
 }
 
 /** UAE numbers: accepts 05XXXXXXXX, 5XXXXXXXX, 9715…, +9715… and returns +9715XXXXXXXX. */

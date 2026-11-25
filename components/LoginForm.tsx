@@ -1,11 +1,13 @@
 'use client';
 import { useState } from 'react';
 import { postJson, useUser } from './UserProvider';
+import { useI18n } from './LangProvider';
 
 type Step = 'phone' | 'code' | 'name';
 
 export function LoginForm({ onDone }: { onDone?: () => void }) {
   const { refresh } = useUser();
+  const { t } = useI18n();
   const [step, setStep] = useState<Step>('phone');
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
@@ -38,37 +40,37 @@ export function LoginForm({ onDone }: { onDone?: () => void }) {
       {step === 'phone' && (
         <>
           <label className="field">
-            <span>رقم الجوال</span>
+            <span>{t.phone}</span>
             <div className="phone-input">
               <span className="cc num">+971</span>
               <input inputMode="tel" autoComplete="tel-national" placeholder="05XXXXXXXX" value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" required />
             </div>
           </label>
-          <p className="hint">سنرسل لك رمز تحقق في رسالة نصية.</p>
-          <button className="btn" disabled={busy || phone.replace(/\D/g, '').length < 9}>{busy ? 'جارٍ الإرسال…' : 'إرسال الرمز'}</button>
+          <p className="hint">{t.smsHint}</p>
+          <button className="btn" disabled={busy || phone.replace(/\D/g, '').length < 9}>{busy ? t.sendingCode : t.sendCode}</button>
         </>
       )}
       {step === 'code' && (
         <>
           <label className="field">
-            <span>رمز التحقق المرسل إلى <b className="num">{phone}</b></span>
+            <span>{t.codeSentTo} <b className="num">{phone}</b></span>
             <input className="otp num" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} dir="ltr" autoFocus required />
           </label>
-          <button className="btn" disabled={busy || code.length < 4}>{busy ? 'جارٍ التحقق…' : 'تأكيد'}</button>
+          <button className="btn" disabled={busy || code.length < 4}>{busy ? t.verifying : t.confirm}</button>
           <div className="row-links">
-            <button type="button" className="link" onClick={() => setStep('phone')}>تغيير الرقم</button>
-            <button type="button" className="link" disabled={busy || Date.now() - sentAt < 30000} onClick={send}>إعادة إرسال الرمز</button>
+            <button type="button" className="link" onClick={() => setStep('phone')}>{t.changeNumber}</button>
+            <button type="button" className="link" disabled={busy || Date.now() - sentAt < 30000} onClick={send}>{t.resend}</button>
           </div>
         </>
       )}
       {step === 'name' && (
         <>
-          <p className="hint">أهلًا بك! هذا أول طلب لك من هذا الرقم، اكتب اسمك لإكمال إنشاء الحساب.</p>
+          <p className="hint">{t.welcomeNew}</p>
           <label className="field">
-            <span>الاسم</span>
+            <span>{t.name}</span>
             <input autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} autoFocus required />
           </label>
-          <button className="btn" disabled={busy || name.trim().length < 2}>{busy ? 'جارٍ الحفظ…' : 'متابعة'}</button>
+          <button className="btn" disabled={busy || name.trim().length < 2}>{busy ? t.saving : t.continue}</button>
         </>
       )}
       {error && <p className="error" role="alert">{error}</p>}

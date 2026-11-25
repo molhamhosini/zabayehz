@@ -32,10 +32,10 @@ export function useUser() {
   return c;
 }
 
-/** POST JSON to one of the site's own /api routes and throw the Arabic error message on failure. */
+/** POST JSON to one of the site's own /api routes and throw the server's error message on failure. */
 export async function postJson<T = unknown>(url: string, body: unknown): Promise<T> {
   const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.error || 'حدث خطأ، حاول مرة أخرى');
+  if (!r.ok) throw new Error(data.error || (document.documentElement.lang === 'en' ? 'Something went wrong, please try again' : 'حدث خطأ، حاول مرة أخرى'));
   return data as T;
 }

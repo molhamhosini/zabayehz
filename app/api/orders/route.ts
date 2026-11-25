@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { errorResponse } from '@/lib/backend';
+import { badRequest, errorResponse, getLang } from '@/lib/backend';
 import { placeOrder, type OrderLineInput } from '@/lib/account';
 
 export async function POST(req: Request) {
@@ -13,8 +13,9 @@ export async function POST(req: Request) {
           multi: typeof l.multi === 'object' && l.multi ? l.multi : {},
         }))
       : [];
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.date))) return NextResponse.json({ error: 'اختر يوم التوصيل' }, { status: 400 });
-    const origin = new URL(req.url).origin;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.date))) return badRequest('اختر يوم التوصيل');
+    // Card payments return to the order page in the visitor's language.
+    const origin = new URL(req.url).origin + ((await getLang()) === 'en' ? '/en' : '');
     const r = await placeOrder({
       lines,
       addressId: Number(b.addressId),

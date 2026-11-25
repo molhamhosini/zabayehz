@@ -1,8 +1,10 @@
 'use client';
 import Image from 'next/image';
 import { useState } from 'react';
+import { useI18n } from './LangProvider';
 
 export function Gallery({ images, alt }: { images: string[]; alt: string }) {
+  const { t } = useI18n();
   const [i, setI] = useState(0);
   if (!images.length) return <div className="gallery"><div className="main" /></div>;
   return (
@@ -13,7 +15,7 @@ export function Gallery({ images, alt }: { images: string[]; alt: string }) {
       {images.length > 1 && (
         <div className="thumbs">
           {images.map((src, k) => (
-            <button key={src} aria-pressed={k === i} onClick={() => setI(k)} aria-label={`الصورة ${k + 1}`} style={{ position: 'relative' }}>
+            <button key={src} aria-pressed={k === i} onClick={() => setI(k)} aria-label={t.imageN(k + 1)} style={{ position: 'relative' }}>
               <Image src={src} alt="" fill sizes="64px" />
             </button>
           ))}

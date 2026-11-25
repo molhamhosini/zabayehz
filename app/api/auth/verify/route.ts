@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { errorResponse, normalizePhone, setTokenCookie } from '@/lib/backend';
+import { badRequest, errorResponse, normalizePhone, setTokenCookie } from '@/lib/backend';
 import { verifyOtp } from '@/lib/account';
 
 export async function POST(req: Request) {
@@ -7,7 +7,7 @@ export async function POST(req: Request) {
     const { phone, code } = await req.json();
     const p = normalizePhone(String(phone ?? ''));
     const c = String(code ?? '').replace(/\D/g, '');
-    if (!p || c.length < 4) return NextResponse.json({ error: 'أدخل رمز التحقق' }, { status: 400 });
+    if (!p || c.length < 4) return badRequest('أدخل رمز التحقق');
     const r = await verifyOtp(p, c);
     if (r.temporary) return NextResponse.json({ needsName: true });
     const res = NextResponse.json({ ok: true });

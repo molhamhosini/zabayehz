@@ -6,7 +6,8 @@ import { AddressForm } from './AddressForm';
 import { useCart } from './CartProvider';
 import { LoginForm } from './LoginForm';
 import { postJson, useUser } from './UserProvider';
-import { formatPrice } from '@/lib/price';
+import { useI18n } from './LangProvider';
+import { optionValue } from './CartView';
 import type { Address } from '@/lib/account';
 
 type Options = {
@@ -18,13 +19,11 @@ type Options = {
   payments: { id: string; label: string }[];
 };
 
-const DAY = new Intl.DateTimeFormat('ar-AE', { weekday: 'long' });
-const DATE = new Intl.DateTimeFormat('ar-AE', { day: 'numeric', month: 'long', numberingSystem: 'latn' });
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-function to12h(t: string) {
+function to12h(t: string, am: string, pm: string) {
   const [h, m] = t.split(':').map(Number);
-  const s = h < 12 ? 'ص' : 'م';
+  const s = h < 12 ? am : pm;
   const hh = h % 12 || 12;
   return `${hh}${m ? `:${String(m).padStart(2, '0')}` : ''} ${s}`;
 }
@@ -39,6 +38,9 @@ export function Checkout() {
   const router = useRouter();
   const { lines, total, ready, clear } = useCart();
   const { user, loading } = useUser();
+  const { t, href, price: formatPrice, opt } = useI18n();
+  const DAY = useMemo(() => new Intl.DateTimeFormat(t.dateLocale, { weekday: 'long' }), [t]);
+  const DATE = useMemo(() => new Intl.DateTimeFormat(t.dateLocale, { day: 'numeric', month: 'long', numberingSystem: 'latn' }), [t]);
   const [opts, setOpts] = useState<Options | null>(null);
   const [addresses, setAddresses] = useState<Address[] | null>(null);
   const [addingAddress, setAddingAddress] = useState(false);
@@ -55,7 +57,7 @@ export function Checkout() {
     fetch('/api/checkout').then((r) => r.json()).then((o: Options) => {
       setOpts(o);
       setPayment((p) => p ?? o.payments?.[0]?.id ?? null);
-    }).catch(() => setError('تعذّر تحميل خيارات التوصيل'));
+    }).catch(() => setError(t.loadOptionsFailed));
   }, []);
 
   useEffect(() => {
@@ -97,9 +99,9 @@ export function Checkout() {
 
   async function submit() {
     setError('');
-    if (!address) return setError('اختر عنوان التوصيل');
-    if (!slotId) return setError('اختر وقت التوصيل');
-    if (!payment) return setError('اختر طريقة الدفع');
+    if (!address) return setError(t.pickAddress);
+    if (!slotId) return setError(t.pickSlot);
+    if (!payment) return setError(t.pickPayment);
     setBusy(true);
     try {
       const r = await postJson<{ orderId: string; redirect?: string }>('/api/orders', {
@@ -111,21 +113,21 @@ export function Checkout() {
         return;
       }
       clear();
-      router.replace(`/order/result?status=success&id=${encodeURIComponent(r.orderId)}`);
+      router.replace(`${href('/order/result')}?status=success&id=${encodeURIComponent(r.orderId)}`);
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
     }
   }
 
-  if (!ready || loading) return <div className="panel">جارٍ التحميل…</div>;
-  if (!lines.length) return <div className="empty"><b>سلتك فارغة</b><Link href="/" style={{ color: 'var(--brand)', fontWeight: 600 }}>تصفّح الذبائح</Link></div>;
+  if (!ready || loading) return <div className="panel">{t.loading}</div>;
+  if (!lines.length) return <div className="empty"><b>{t.emptyCart}</b><Link href={href('/')} style={{ color: 'var(--brand)', fontWeight: 600 }}>{t.browse}</Link></div>;
 
   return (
     <div className="checkout">
       <div className="steps">
         <section className="panel">
-          <h2><span className="n">1</span> رقم الجوال</h2>
+          <h2><span className="n">1</span> {t.stepPhone}</h2>
           {user ? (
             <p className="done">✓ {user.name} · <span className="num">{user.phone}</span></p>
           ) : (
@@ -134,19 +136,19 @@ export function Checkout() {
         </section>
 
         <section className={`panel${user ? '' : ' locked'}`} aria-disabled={!user}>
-          <h2><span className="n">2</span> عنوان التوصيل</h2>
+          <h2><span className="n">2</span> {t.stepAddress}</h2>
           {user && addresses && (
             <>
               {addresses.length > 0 && !addingAddress && (
                 <div className="addr-list" role="radiogroup">
                   {addresses.map((a) => (
                     <button key={a.id} type="button" className="addr" aria-pressed={a.id === addressId} onClick={() => setAddressId(a.id)}>
-                      <b>{a.address_type === 'Workplace' ? 'العمل' : a.address_type === 'Other' ? 'آخر' : 'المنزل'}</b>
-                      <span>{[a.house && `فيلا/مبنى ${a.house}`, a.floor && `طابق ${a.floor}`, a.road, a.address].filter(Boolean).join('، ')}</span>
+                      <b>{t.addrTypes[a.address_type] ?? t.addrTypes.Home}</b>
+                      <span dir="auto">{[a.house && t.villa(a.house), a.floor && t.floor(a.floor), a.road, a.address].filter(Boolean).join(t.listSep)}</span>
                       <small>{a.contact_person_name} · <span className="num">{a.contact_person_number}</span></small>
                     </button>
                   ))}
-                  <button type="button" className="link" onClick={() => setAddingAddress(true)}>+ إضافة عنوان جديد</button>
+                  <button type="button" className="link" onClick={() => setAddingAddress(true)}>{t.addAddress}</button>
                 </div>
               )}
               {addingAddress && (
@@ -155,19 +157,19 @@ export function Checkout() {
                   onSaved={(list) => { setAddresses(list); setAddressId(list[list.length - 1]?.id ?? null); setAddingAddress(false); }}
                 />
               )}
-              {outOfZone && <p className="error">هذا العنوان خارج منطقة التوصيل حاليًا.</p>}
+              {outOfZone && <p className="error">{t.outOfZone}</p>}
             </>
           )}
         </section>
 
         <section className={`panel${user ? '' : ' locked'}`}>
-          <h2><span className="n">3</span> موعد التوصيل</h2>
+          <h2><span className="n">3</span> {t.stepTime}</h2>
           {user && opts && (
             <>
               <div className="days">
                 {days.map((d, i) => (
                   <button key={i} type="button" className="day" aria-pressed={i === day} onClick={() => setDay(i)}>
-                    <b>{i === 0 ? 'اليوم' : i === 1 ? 'غدًا' : DAY.format(d)}</b>
+                    <b>{i === 0 ? t.today : i === 1 ? t.tomorrow : DAY.format(d)}</b>
                     <small>{DATE.format(d)}</small>
                   </button>
                 ))}
@@ -175,17 +177,17 @@ export function Checkout() {
               <div className="pills" style={{ marginTop: 12 }}>
                 {slots.map((s) => (
                   <button key={s.id} type="button" className="pill" aria-pressed={s.id === slotId} onClick={() => setSlotId(s.id)}>
-                    من {to12h(s.from)} إلى {to12h(s.to)}
+                    {t.slot(to12h(s.from, t.am, t.pm), to12h(s.to, t.am, t.pm))}
                   </button>
                 ))}
-                {slots.length === 0 && <p className="hint">لا توجد أوقات متاحة في هذا اليوم.</p>}
+                {slots.length === 0 && <p className="hint">{t.noSlots}</p>}
               </div>
             </>
           )}
         </section>
 
         <section className={`panel${user ? '' : ' locked'}`}>
-          <h2><span className="n">4</span> طريقة الدفع</h2>
+          <h2><span className="n">4</span> {t.stepPayment}</h2>
           {user && opts && (
             <>
               <div className="pills">
@@ -194,8 +196,8 @@ export function Checkout() {
                 ))}
               </div>
               <label className="field" style={{ marginTop: 14 }}>
-                <span>ملاحظات للطلب (اختياري)</span>
-                <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="مثل: الاتصال قبل الوصول" />
+                <span>{t.orderNote}</span>
+                <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder={t.orderNotePh} />
               </label>
             </>
           )}
@@ -203,24 +205,24 @@ export function Checkout() {
       </div>
 
       <aside className="panel summary">
-        <h2>ملخص الطلب</h2>
+        <h2>{t.orderSummary}</h2>
         <ul className="sum-lines">
           {lines.map((l) => (
             <li key={l.key}>
-              <span>{l.name} <small className="amt">× {l.qty}</small><br /><small className="hint">{l.options.slice(0, 2).map((o) => o.value).join(' · ')}</small></span>
+              <span><span dir="auto">{l.name}</span> <small className="amt">× {l.qty}</small><br /><small className="hint">{l.options.slice(0, 2).map((o) => optionValue(o.value, opt, t.listSep)).join(' · ')}</small></span>
               <span className="amt">{formatPrice(l.unitPrice * l.qty)}</span>
             </li>
           ))}
         </ul>
-        <div className="sum-row"><span>المجموع</span><span className="amt">{formatPrice(total)}</span></div>
-        <div className="sum-row"><span>التوصيل</span><span className="amt">{address ? (delivery ? formatPrice(delivery) : 'مجاني') : '—'}</span></div>
-        <div className="sum-row total"><span>الإجمالي</span><span className="amt">{formatPrice(total + delivery)}</span></div>
-        {belowMin && <p className="error">الحد الأدنى للطلب {formatPrice(opts!.minOrder)}.</p>}
+        <div className="sum-row"><span>{t.subtotal}</span><span className="amt">{formatPrice(total)}</span></div>
+        <div className="sum-row"><span>{t.delivery}</span><span className="amt">{address ? (delivery ? formatPrice(delivery) : t.free) : '—'}</span></div>
+        <div className="sum-row total"><span>{t.total}</span><span className="amt">{formatPrice(total + delivery)}</span></div>
+        {belowMin && <p className="error">{t.minOrder(formatPrice(opts!.minOrder))}</p>}
         {error && <p className="error" role="alert">{error}</p>}
         <button className="btn" onClick={submit} disabled={!user || busy || belowMin || outOfZone || !address || !slotId || !payment}>
-          {busy ? 'جارٍ إرسال الطلب…' : payment && payment !== 'cash_on_delivery' ? 'متابعة للدفع' : 'تأكيد الطلب'}
+          {busy ? t.sending : payment && payment !== 'cash_on_delivery' ? t.toPayment : t.confirmOrder}
         </button>
-        <p className="hint" style={{ textAlign: 'center' }}>الأسعار تُراجع من النظام عند التأكيد.</p>
+        <p className="hint" style={{ textAlign: 'center' }}>{t.pricesChecked}</p>
       </aside>
     </div>
   );

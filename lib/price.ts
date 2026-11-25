@@ -34,6 +34,6 @@ export function finalPrice(price: number, d: Discount): number {
 const nf = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 export const CURRENCY = 'د.إ';
 
-export function formatPrice(n: number): string {
-  return `${nf.format(n)} ${CURRENCY}`;
+export function formatPrice(n: number, lang: 'ar' | 'en' = 'ar'): string {
+  return lang === 'en' ? `AED ${nf.format(n)}` : `${nf.format(n)} ${CURRENCY}`;
 }

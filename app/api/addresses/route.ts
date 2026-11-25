@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { errorResponse, normalizePhone } from '@/lib/backend';
+import { badRequest, errorResponse, normalizePhone } from '@/lib/backend';
 import { addAddress, listAddresses } from '@/lib/account';
 
 export async function GET() {
@@ -15,10 +15,10 @@ export async function POST(req: Request) {
     const b = await req.json();
     const lat = Number(b.latitude), lng = Number(b.longitude);
     const phone = normalizePhone(String(b.contact_person_number ?? ''));
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return NextResponse.json({ error: 'حدّد موقع التوصيل' }, { status: 400 });
-    if (!String(b.address ?? '').trim()) return NextResponse.json({ error: 'اكتب العنوان' }, { status: 400 });
-    if (!String(b.contact_person_name ?? '').trim()) return NextResponse.json({ error: 'اكتب اسم المستلم' }, { status: 400 });
-    if (!phone) return NextResponse.json({ error: 'رقم جوال المستلم غير صحيح' }, { status: 400 });
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return badRequest('حدّد موقع التوصيل');
+    if (!String(b.address ?? '').trim()) return badRequest('اكتب العنوان');
+    if (!String(b.contact_person_name ?? '').trim()) return badRequest('اكتب اسم المستلم');
+    if (!phone) return badRequest('رقم جوال المستلم غير صحيح');
     await addAddress({
       address_type: ['Home', 'Workplace', 'Other'].includes(b.address_type) ? b.address_type : 'Home',
       address: String(b.address).trim().slice(0, 250),

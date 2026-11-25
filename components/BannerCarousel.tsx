@@ -2,10 +2,12 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+import { useI18n } from './LangProvider';
 
 type Banner = { id: number; title: string; image: string; href: string | null };
 
 export function BannerCarousel({ banners }: { banners: Banner[] }) {
+  const { t } = useI18n();
   const ref = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
 
@@ -43,10 +45,10 @@ export function BannerCarousel({ banners }: { banners: Banner[] }) {
 
   return (
     <div>
-      <div className="banners" ref={ref} aria-roledescription="carousel" aria-label="العروض">
+      <div className="banners" ref={ref} aria-roledescription="carousel" aria-label={t.bannersLabel}>
         {banners.map((b, i) => {
           const img = (
-            <Image src={b.image} alt={b.title || 'عرض ذبائح الجزيرة'} fill priority={i === 0} sizes="(max-width: 900px) 100vw, 600px" />
+            <Image src={b.image} alt={b.title || t.bannerAlt} fill priority={i === 0} sizes="(max-width: 900px) 100vw, 600px" />
           );
           return b.href ? (
             <Link key={b.id} href={b.href} className="banner">{img}</Link>
@@ -58,7 +60,7 @@ export function BannerCarousel({ banners }: { banners: Banner[] }) {
       {banners.length > 1 && (
         <div className="dots">
           {banners.map((b, i) => (
-            <button key={b.id} aria-label={`العرض ${i + 1}`} aria-current={i === active} onClick={() => go(i)} />
+            <button key={b.id} aria-label={t.bannerN(i + 1)} aria-current={i === active} onClick={() => go(i)} />
           ))}
         </div>
       )}

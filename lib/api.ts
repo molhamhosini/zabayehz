@@ -8,6 +8,7 @@ import type {
   ProductDetail,
 } from './types';
 import { bestDiscount, finalPrice } from './price';
+import { categoryName, hasArabic, type Lang } from './i18n';
 
 const API = (process.env.API_BASE_URL || 'https://poszabayeh.com').replace(/\/$/, '');
 const MOCK = process.env.MOCK_API === '1';
@@ -40,9 +41,11 @@ function loadFixtures(): Promise<Fixtures> {
   return fixtures;
 }
 
-async function get<T>(path: string, revalidate = REVALIDATE): Promise<T> {
-  const res = await fetch(`${API}/api/v1/${path}`, {
-    headers: { 'X-localization': 'ar', Accept: 'application/json' },
+async function get<T>(path: string, revalidate = REVALIDATE, lang: Lang = 'ar'): Promise<T> {
+  // The language is also put in the address so the two languages are cached separately.
+  const url = `${API}/api/v1/${path}${path.includes('?') ? '&' : '?'}lang=${lang}`;
+  const res = await fetch(url, {
+    headers: { 'X-localization': lang, Accept: 'application/json' },
     next: { revalidate },
   });
   if (!res.ok) throw new Error(`API ${path} -> ${res.status}`);
@@ -69,15 +72,21 @@ function ratingOf(p: ApiProduct): number | null {
   return Number.isFinite(v) && v > 0 ? Math.round(v * 10) / 10 : null;
 }
 
-function toCard(p: ApiProduct, cfg: ApiConfig): ProductCard {
+/** English names from the system are sometimes lower case ("Naimi sheep"). */
+function nameOf(p: ApiProduct, lang: Lang): string {
+  const n = p.name.trim();
+  return lang === 'en' ? n.charAt(0).toUpperCase() + n.slice(1) : n;
+}
+
+function toCard(p: ApiProduct, cfg: ApiConfig, lang: Lang = 'ar'): ProductCard {
   const d = bestDiscount(p, p.price);
   return {
     id: p.id,
-    name: p.name.trim(),
+    name: nameOf(p, lang),
     image: joinUrl(cfg.base_urls.product_image_url, p.image?.[0]),
     price: p.price,
     finalPrice: finalPrice(p.price, d),
-    unit: p.unit === 'kg' ? 'كجم' : 'رأس',
+    unit: p.unit === 'kg' ? 'kg' : 'pc',
     rating: ratingOf(p),
     inStock: (p.total_stock ?? 1) > 0,
   };
@@ -101,8 +110,9 @@ function stripHtml(html?: string | null): string {
     .trim();
 }
 
-function toDetail(p: ApiProduct, cfg: ApiConfig): ProductDetail {
-  const card = toCard(p, cfg);
+function toDetail(p: ApiProduct, cfg: ApiConfig, lang: Lang = 'ar'): ProductDetail {
+  const card = toCard(p, cfg, lang);
+  const description = stripHtml(p.description);
   const choices: ChoiceGroup[] = (p.choice_options ?? []).map((c) => {
     const kind: ChoiceGroup['kind'] =
       c.display_type === 'multi_image' ? 'multi' : c.display_type === 'image' ? 'image' : 'text';
@@ -121,7 +131,8 @@ function toDetail(p: ApiProduct, cfg: ApiConfig): ProductDetail {
   const d = bestDiscount(p, p.price);
   return {
     ...card,
-    description: stripHtml(p.description),
+    // An Arabic-only description is left out of the English page (it shows a short English line instead).
+    description: lang === 'en' && hasArabic(description) ? '' : description,
     images: (p.image ?? []).map((f) => joinUrl(cfg.base_urls.product_image_url, f)!).filter(Boolean),
     maxQty: Number(p.maximum_order_quantity) || 10,
     discount: d,
@@ -129,7 +140,7 @@ function toDetail(p: ApiProduct, cfg: ApiConfig): ProductDetail {
     variants,
     reviews: (p.active_reviews ?? []).map((r) => ({
       id: r.id,
-      name: [r.customer?.f_name, r.customer?.l_name].filter(Boolean).join(' ').trim() || 'عميل',
+      name: [r.customer?.f_name, r.customer?.l_name].filter(Boolean).join(' ').trim() || (lang === 'en' ? 'Customer' : 'عميل'),
       rating: r.rating,
       comment: r.comment ?? '',
       date: r.created_at,
@@ -140,67 +151,68 @@ function toDetail(p: ApiProduct, cfg: ApiConfig): ProductDetail {
 
 // ---------- public data functions ----------
 
-export async function getCategories() {
+export async function getCategories(lang: Lang = 'ar') {
   const cfg = await getConfig();
-  const list = MOCK ? (await loadFixtures()).categories : await get<ApiCategory[]>('categories', 600);
+  const list = MOCK ? (await loadFixtures()).categories : await get<ApiCategory[]>('categories', 600, lang);
   return list
     .filter((c) => SHOP_CATEGORIES.has(Number(c.id)))
-    .map((c) => ({ id: c.id, name: c.name.trim(), image: joinUrl(cfg.base_urls.category_image_url, c.image) }));
+    .map((c) => ({ id: c.id, name: categoryName(lang, c.id, c.name.trim()), image: joinUrl(cfg.base_urls.category_image_url, c.image) }));
 }
 
-export async function getBanners() {
+export async function getBanners(lang: Lang = 'ar') {
   const cfg = await getConfig();
-  const list = MOCK ? (await loadFixtures()).banners : await get<ApiBanner[]>('banners', 600);
+  const list = MOCK ? (await loadFixtures()).banners : await get<ApiBanner[]>('banners', 600, lang);
   return list.filter((b) => !b.category_id || SHOP_CATEGORIES.has(Number(b.category_id))).map((b) => ({
     id: b.id,
-    title: b.title && b.title.trim() !== '.' ? b.title.trim() : '',
+    title: b.title && b.title.trim() !== '.' && !(lang === 'en' && hasArabic(b.title)) ? b.title.trim() : '',
     image: joinUrl(cfg.base_urls.banner_image_url, b.image)!,
     href: b.product_id ? `/product/${b.product_id}` : b.category_id ? `/category/${b.category_id}` : null,
   }));
 }
 
-export async function getCategoryProducts(categoryId: number): Promise<ProductCard[]> {
+export async function getCategoryProducts(categoryId: number, lang: Lang = 'ar'): Promise<ProductCard[]> {
   if (!SHOP_CATEGORIES.has(categoryId)) return [];
   const cfg = await getConfig();
   if (MOCK) {
     const all = (await loadFixtures()).products;
-    return all.filter((p) => p.category_ids?.some((c) => Number(c.id) === categoryId)).map((p) => toCard(p, cfg));
+    return all.filter((p) => p.category_ids?.some((c) => Number(c.id) === categoryId)).map((p) => toCard(p, cfg, lang));
   }
-  const list = await get<ApiProduct[]>(`categories/products/${categoryId}`);
-  return list.map((p) => toCard(p, cfg));
+  const list = await get<ApiProduct[]>(`categories/products/${categoryId}`, REVALIDATE, lang);
+  return list.map((p) => toCard(p, cfg, lang));
 }
 
-export async function getPopular(limit = 10): Promise<ProductCard[]> {
+export async function getPopular(limit = 10, lang: Lang = 'ar'): Promise<ProductCard[]> {
   const cfg = await getConfig();
   if (MOCK) {
     const f = await loadFixtures();
-    return f.popular.map((id) => f.products.find((p) => p.id === id)!).filter(Boolean).filter(isShopProduct).slice(0, limit).map((p) => toCard(p, cfg));
+    return f.popular.map((id) => f.products.find((p) => p.id === id)!).filter(Boolean).filter(isShopProduct).slice(0, limit).map((p) => toCard(p, cfg, lang));
   }
-  const r = await get<{ products: ApiProduct[] }>(`products/popular?limit=${limit * 4}&offset=1`);
-  return r.products.filter(isShopProduct).slice(0, limit).map((p) => toCard(p, cfg));
+  const r = await get<{ products: ApiProduct[] }>(`products/popular?limit=${limit * 4}&offset=1`, REVALIDATE, lang);
+  return r.products.filter(isShopProduct).slice(0, limit).map((p) => toCard(p, cfg, lang));
 }
 
-export async function getLatest(limit = 10): Promise<ProductCard[]> {
+export async function getLatest(limit = 10, lang: Lang = 'ar'): Promise<ProductCard[]> {
   const cfg = await getConfig();
-  if (MOCK) return (await loadFixtures()).products.filter(isShopProduct).slice(0, limit).map((p) => toCard(p, cfg));
-  const r = await get<{ products: ApiProduct[] }>(`products/latest?limit=${limit * 4}&offset=1`);
-  return r.products.filter(isShopProduct).slice(0, limit).map((p) => toCard(p, cfg));
+  if (MOCK) return (await loadFixtures()).products.filter(isShopProduct).slice(0, limit).map((p) => toCard(p, cfg, lang));
+  const r = await get<{ products: ApiProduct[] }>(`products/latest?limit=${limit * 4}&offset=1`, REVALIDATE, lang);
+  return r.products.filter(isShopProduct).slice(0, limit).map((p) => toCard(p, cfg, lang));
 }
 
-export async function searchProducts(q: string, limit = 40): Promise<ProductCard[]> {
+export async function searchProducts(q: string, lang: Lang = 'ar', limit = 40): Promise<ProductCard[]> {
   const term = q.trim();
   if (!term) return [];
   const cfg = await getConfig();
   if (MOCK) {
     const norm = (s: string) => s.replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/\s+/g, ' ');
     const t = norm(term);
-    return (await loadFixtures()).products.filter((p) => isShopProduct(p) && norm(p.name).includes(t)).map((p) => toCard(p, cfg));
+    return (await loadFixtures()).products.filter((p) => isShopProduct(p) && norm(p.name).includes(t)).map((p) => toCard(p, cfg, lang));
   }
   const r = await get<{ products: ApiProduct[] }>(
     `products/search?name=${encodeURIComponent(term)}&limit=${limit * 3}&offset=1`,
     60,
+    lang,
   );
-  return r.products.filter(isShopProduct).slice(0, limit).map((p) => toCard(p, cfg));
+  return r.products.filter(isShopProduct).slice(0, limit).map((p) => toCard(p, cfg, lang));
 }
 
 /** Raw product as the API returns it (used server-side to price orders). */
@@ -218,15 +230,15 @@ export async function getProductRaw(id: number): Promise<ApiProduct | null> {
   }
 }
 
-export async function getProduct(id: number): Promise<ProductDetail | null> {
+export async function getProduct(id: number, lang: Lang = 'ar'): Promise<ProductDetail | null> {
   const cfg = await getConfig();
   if (MOCK) {
     const p = (await loadFixtures()).products.find((x) => x.id === id);
-    return p && isShopProduct(p) ? toDetail(p, cfg) : null;
+    return p && isShopProduct(p) ? toDetail(p, cfg, lang) : null;
   }
   try {
-    const p = await get<ApiProduct>(`products/details/${id}`);
-    return isShopProduct(p) ? toDetail(p, cfg) : null;
+    const p = await get<ApiProduct>(`products/details/${id}`, REVALIDATE, lang);
+    return isShopProduct(p) ? toDetail(p, cfg, lang) : null;
   } catch (e) {
     if (String(e).includes('-> 404')) return null;
     throw e;

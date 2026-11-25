@@ -6,9 +6,16 @@ export const revalidate = 3600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [cats, ids] = await Promise.all([getCategories(), getAllProductIds()]);
+  // Each page is listed once, in Arabic, with its English version as an alternate.
+  const entry = (path: string, changeFrequency: 'daily' | 'weekly', priority: number) => ({
+    url: `${SITE_URL}${path === '/' ? '' : path}`,
+    changeFrequency,
+    priority,
+    alternates: { languages: { ar: `${SITE_URL}${path === '/' ? '' : path}`, en: `${SITE_URL}/en${path === '/' ? '' : path}` } },
+  });
   return [
-    { url: SITE_URL, changeFrequency: 'daily', priority: 1 },
-    ...cats.map((c) => ({ url: `${SITE_URL}/category/${c.id}`, changeFrequency: 'daily' as const, priority: 0.8 })),
-    ...ids.map((id) => ({ url: `${SITE_URL}/product/${id}`, changeFrequency: 'weekly' as const, priority: 0.7 })),
+    entry('/', 'daily', 1),
+    ...cats.map((c) => entry(`/category/${c.id}`, 'daily', 0.8)),
+    ...ids.map((id) => entry(`/product/${id}`, 'weekly', 0.7)),
   ];
 }

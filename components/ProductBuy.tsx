@@ -3,13 +3,15 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import type { ProductDetail } from '@/lib/types';
-import { finalPrice, formatPrice } from '@/lib/price';
+import { finalPrice } from '@/lib/price';
 import { variantKey } from '@/lib/variant';
 import { useCart } from './CartProvider';
 import { CheckIcon } from './icons';
+import { useI18n } from './LangProvider';
 
 export function ProductBuy({ p }: { p: ProductDetail }) {
   const { add } = useCart();
+  const { t, href, price: formatPrice, opt } = useI18n();
   // Single-choice groups start on their first option so a price shows right away.
   const [picked, setPicked] = useState<(number | null)[]>(() =>
     p.choices.map((c) => (c.kind !== 'multi' && c.required && c.options.length ? 0 : null)),
@@ -78,35 +80,35 @@ export function ProductBuy({ p }: { p: ProductDetail }) {
     setAdded(true);
   }
 
-  const buyLabel = soldOut ? 'غير متوفر حاليًا' : missing >= 0 ? `اختر ${p.choices[missing].title}` : 'أضف إلى السلة';
+  const buyLabel = soldOut ? t.soldOut : missing >= 0 ? t.choose(opt(p.choices[missing].title)) : t.addToCart;
 
   return (
     <div>
       <div className="bigprice" aria-live="polite">
         <span className="now amt" style={{ fontWeight: 700, color: 'var(--brand-deep)' }}>{formatPrice(now * qty)}</span>
         {now < base && <span className="was amt" style={{ textDecoration: 'line-through', color: 'var(--muted)' }}>{formatPrice(base * qty)}</span>}
-        {now < base && <span className="save">وفّر <span className="amt">{formatPrice((base - now) * qty)}</span></span>}
-        <span className="note">السعر يشمل الذبح والتقطيع والتغليف حسب اختيارك{qty > 1 ? ` (${qty} × ${formatPrice(now)})` : ''}.</span>
+        {now < base && <span className="save">{t.save} <span className="amt">{formatPrice((base - now) * qty)}</span></span>}
+        <span className="note">{t.priceNote}{qty > 1 ? ` (${qty} × ${formatPrice(now)})` : ''}.</span>
       </div>
 
       {p.choices.map((c, i) => (
         <fieldset key={c.title} className="opt">
-          <legend className="sr-only">{c.title}</legend>
+          <legend className="sr-only">{opt(c.title)}</legend>
           <div className="opt-head">
-            <h2 aria-hidden>{c.title}</h2>
+            <h2 aria-hidden>{opt(c.title)}</h2>
             {c.kind === 'multi' ? (
-              <span>اختياري، يمكنك اختيار أكثر من خيار</span>
+              <span>{t.multiHint}</span>
             ) : picked[i] !== null ? (
-              <span className="chosen">{c.options[picked[i]!].label}</span>
+              <span className="chosen">{opt(c.options[picked[i]!].label)}</span>
             ) : (
-              <span>{c.required ? 'مطلوب' : 'اختياري'}</span>
+              <span>{c.required ? t.required : t.optional}</span>
             )}
           </div>
           {c.kind === 'text' ? (
             <div className="pills">
               {c.options.map((o, j) => (
                 <button key={o.label} type="button" className="pill" aria-pressed={picked[i] === j} onClick={() => choose(i, j)}>
-                  {o.label}
+                  {opt(o.label)}
                 </button>
               ))}
             </div>
@@ -119,7 +121,7 @@ export function ProductBuy({ p }: { p: ProductDetail }) {
                     <span className="ph">
                       {o.image ? <Image src={o.image} alt="" width={120} height={120} onError={(e) => ((e.currentTarget as HTMLImageElement).style.visibility = "hidden")} /> : <span aria-hidden>—</span>}
                     </span>
-                    {o.label}
+                    {opt(o.label)}
                     <span className="tick"><CheckIcon size={13} /></span>
                   </button>
                 );
@@ -130,26 +132,26 @@ export function ProductBuy({ p }: { p: ProductDetail }) {
       ))}
 
       <div className="buy">
-        <div className="qty" role="group" aria-label="الكمية">
-          <button type="button" onClick={() => setQty((q) => Math.min(maxQty, q + 1))} disabled={qty >= maxQty} aria-label="زيادة">+</button>
+        <div className="qty" role="group" aria-label={t.quantity}>
+          <button type="button" onClick={() => setQty((q) => Math.min(maxQty, q + 1))} disabled={qty >= maxQty} aria-label={t.increase}>+</button>
           <output className="amt" aria-live="polite">{qty}</output>
-          <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1} aria-label="إنقاص">−</button>
+          <button type="button" onClick={() => setQty((q) => Math.max(1, q - 1))} disabled={qty <= 1} aria-label={t.decrease}>−</button>
         </div>
         <button type="button" className="btn" onClick={addToCart} disabled={soldOut || missing >= 0}>{buyLabel}</button>
       </div>
       {added && (
         <div className="added" role="status">
-          <span>أُضيف إلى السلة.</span>
-          <Link href="/cart">عرض السلة</Link>
+          <span>{t.added}</span>
+          <Link href={href('/cart')}>{t.viewCart}</Link>
         </div>
       )}
 
       <div className="mobile-buy">
         <div className="p">
-          <small>الإجمالي</small>
+          <small>{t.total}</small>
           <b className="amt">{formatPrice(now * qty)}</b>
         </div>
-        <button type="button" className="btn" onClick={addToCart} disabled={soldOut || missing >= 0}>{added ? 'أُضيف ✓' : buyLabel}</button>
+        <button type="button" className="btn" onClick={addToCart} disabled={soldOut || missing >= 0}>{added ? t.addedShort : buyLabel}</button>
       </div>
     </div>
   );
