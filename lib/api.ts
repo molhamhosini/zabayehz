@@ -14,6 +14,18 @@ const MOCK = process.env.MOCK_API === '1';
 // How long (seconds) a cached API response is reused before Next.js refetches it in the background.
 const REVALIDATE = 120;
 
+// Only these categories are sold on the website; everything else (POS-only items) stays hidden.
+// Override with SHOP_CATEGORY_IDS="13,15,16,17" in the environment.
+// 13 ملحمة · 15 العروض · 16 الماعز · 17 الخروف
+export const SHOP_CATEGORIES = new Set(
+  (process.env.SHOP_CATEGORY_IDS || '13,15,16,17').split(',').map((x) => Number(x.trim())).filter(Number.isFinite),
+);
+
+/** True when the product belongs to at least one of the shop categories. */
+export function isShopProduct(p: Pick<ApiProduct, 'category_ids'>): boolean {
+  return (p.category_ids ?? []).some((c) => SHOP_CATEGORIES.has(Number(c.id)));
+}
+
 type Fixtures = {
   config: ApiConfig;
   categories: ApiCategory[];
@@ -122,7 +134,7 @@ function toDetail(p: ApiProduct, cfg: ApiConfig): ProductDetail {
       comment: r.comment ?? '',
       date: r.created_at,
     })),
-    categoryId: Number(p.category_ids?.[0]?.id) || null,
+    categoryId: Number((p.category_ids ?? []).find((c) => SHOP_CATEGORIES.has(Number(c.id)))?.id) || null,
   };
 }
 
@@ -131,13 +143,15 @@ function toDetail(p: ApiProduct, cfg: ApiConfig): ProductDetail {
 export async function getCategories() {
   const cfg = await getConfig();
   const list = MOCK ? (await loadFixtures()).categories : await get<ApiCategory[]>('categories', 600);
-  return list.map((c) => ({ id: c.id, name: c.name.trim(), image: joinUrl(cfg.base_urls.category_image_url, c.image) }));
+  return list
+    .filter((c) => SHOP_CATEGORIES.has(Number(c.id)))
+    .map((c) => ({ id: c.id, name: c.name.trim(), image: joinUrl(cfg.base_urls.category_image_url, c.image) }));
 }
 
 export async function getBanners() {
   const cfg = await getConfig();
   const list = MOCK ? (await loadFixtures()).banners : await get<ApiBanner[]>('banners', 600);
-  return list.map((b) => ({
+  return list.filter((b) => !b.category_id || SHOP_CATEGORIES.has(Number(b.category_id))).map((b) => ({
     id: b.id,
     title: b.title && b.title.trim() !== '.' ? b.title.trim() : '',
     image: joinUrl(cfg.base_urls.banner_image_url, b.image)!,
@@ -146,6 +160,7 @@ export async function getBanners() {
 }
 
 export async function getCategoryProducts(categoryId: number): Promise<ProductCard[]> {
+  if (!SHOP_CATEGORIES.has(categoryId)) return [];
   const cfg = await getConfig();
   if (MOCK) {
     const all = (await loadFixtures()).products;
@@ -159,17 +174,17 @@ export async function getPopular(limit = 10): Promise<ProductCard[]> {
   const cfg = await getConfig();
   if (MOCK) {
     const f = await loadFixtures();
-    return f.popular.map((id) => f.products.find((p) => p.id === id)!).filter(Boolean).slice(0, limit).map((p) => toCard(p, cfg));
+    return f.popular.map((id) => f.products.find((p) => p.id === id)!).filter(Boolean).filter(isShopProduct).slice(0, limit).map((p) => toCard(p, cfg));
   }
-  const r = await get<{ products: ApiProduct[] }>(`products/popular?limit=${limit}&offset=1`);
-  return r.products.map((p) => toCard(p, cfg));
+  const r = await get<{ products: ApiProduct[] }>(`products/popular?limit=${limit * 4}&offset=1`);
+  return r.products.filter(isShopProduct).slice(0, limit).map((p) => toCard(p, cfg));
 }
 
 export async function getLatest(limit = 10): Promise<ProductCard[]> {
   const cfg = await getConfig();
-  if (MOCK) return (await loadFixtures()).products.slice(0, limit).map((p) => toCard(p, cfg));
-  const r = await get<{ products: ApiProduct[] }>(`products/latest?limit=${limit}&offset=1`);
-  return r.products.map((p) => toCard(p, cfg));
+  if (MOCK) return (await loadFixtures()).products.filter(isShopProduct).slice(0, limit).map((p) => toCard(p, cfg));
+  const r = await get<{ products: ApiProduct[] }>(`products/latest?limit=${limit * 4}&offset=1`);
+  return r.products.filter(isShopProduct).slice(0, limit).map((p) => toCard(p, cfg));
 }
 
 export async function searchProducts(q: string, limit = 40): Promise<ProductCard[]> {
@@ -179,20 +194,24 @@ export async function searchProducts(q: string, limit = 40): Promise<ProductCard
   if (MOCK) {
     const norm = (s: string) => s.replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/\s+/g, ' ');
     const t = norm(term);
-    return (await loadFixtures()).products.filter((p) => norm(p.name).includes(t)).map((p) => toCard(p, cfg));
+    return (await loadFixtures()).products.filter((p) => isShopProduct(p) && norm(p.name).includes(t)).map((p) => toCard(p, cfg));
   }
   const r = await get<{ products: ApiProduct[] }>(
-    `products/search?name=${encodeURIComponent(term)}&limit=${limit}&offset=1`,
+    `products/search?name=${encodeURIComponent(term)}&limit=${limit * 3}&offset=1`,
     60,
   );
-  return r.products.map((p) => toCard(p, cfg));
+  return r.products.filter(isShopProduct).slice(0, limit).map((p) => toCard(p, cfg));
 }
 
 /** Raw product as the API returns it (used server-side to price orders). */
 export async function getProductRaw(id: number): Promise<ApiProduct | null> {
-  if (MOCK) return (await loadFixtures()).products.find((x) => x.id === id) ?? null;
+  if (MOCK) {
+    const p = (await loadFixtures()).products.find((x) => x.id === id);
+    return p && isShopProduct(p) ? p : null;
+  }
   try {
-    return await get<ApiProduct>(`products/details/${id}`, 60);
+    const p = await get<ApiProduct>(`products/details/${id}`, 60);
+    return isShopProduct(p) ? p : null;
   } catch (e) {
     if (String(e).includes('-> 404')) return null;
     throw e;
@@ -203,10 +222,11 @@ export async function getProduct(id: number): Promise<ProductDetail | null> {
   const cfg = await getConfig();
   if (MOCK) {
     const p = (await loadFixtures()).products.find((x) => x.id === id);
-    return p ? toDetail(p, cfg) : null;
+    return p && isShopProduct(p) ? toDetail(p, cfg) : null;
   }
   try {
-    return toDetail(await get<ApiProduct>(`products/details/${id}`), cfg);
+    const p = await get<ApiProduct>(`products/details/${id}`);
+    return isShopProduct(p) ? toDetail(p, cfg) : null;
   } catch (e) {
     if (String(e).includes('-> 404')) return null;
     throw e;
@@ -214,7 +234,7 @@ export async function getProduct(id: number): Promise<ProductDetail | null> {
 }
 
 export async function getAllProductIds(): Promise<number[]> {
-  if (MOCK) return (await loadFixtures()).products.map((p) => p.id);
+  if (MOCK) return (await loadFixtures()).products.filter(isShopProduct).map((p) => p.id);
   const r = await get<{ products: ApiProduct[] }>('products/latest?limit=200&offset=1', 3600);
-  return r.products.map((p) => p.id);
+  return r.products.filter(isShopProduct).map((p) => p.id);
 }
