@@ -31,7 +31,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="ar" dir="rtl">
       <body>
         <CartProvider>
-          <Header phone={cfg.ecommerce_phone} categories={categories} />
+          <Header categories={categories} />
           <main>{children}</main>
           <Footer cfg={cfg} categories={categories} />
           {wa && (

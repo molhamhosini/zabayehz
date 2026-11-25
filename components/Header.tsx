@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { CartButton } from './CartButton';
 import { PhoneIcon, SearchIcon } from './icons';
+import { CONTACT, telHref } from '@/lib/site';
 
-type Props = { phone?: string; categories: { id: number; name: string }[]; q?: string };
+type Props = { categories: { id: number; name: string }[]; q?: string };
 
-export function Header({ phone, categories, q }: Props) {
+export function Header({ categories, q }: Props) {
   return (
     <>
       <div className="topbar">
@@ -14,11 +15,12 @@ export function Header({ phone, categories, q }: Props) {
             <span>إشراف بيطري كامل</span>
             <span>توصيل مبرّد</span>
           </div>
-          {phone && (
-            <a href={`tel:${phone}`} style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-              <PhoneIcon size={15} /> <span className="num">{phone}</span>
-            </a>
-          )}
+          <div style={{ display: 'inline-flex', gap: 12, alignItems: 'center' }}>
+            <PhoneIcon size={15} />
+            {CONTACT.phones.map((n, i) => (
+              <a key={n} href={telHref(n)} className={`num${i > 0 ? ' hide-sm' : ''}`}>{n}</a>
+            ))}
+          </div>
         </div>
       </div>
       <header className="header">

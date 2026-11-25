@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { ApiConfig } from '@/lib/types';
+import { CONTACT, telHref } from '@/lib/site';
 
 export function Footer({ cfg, categories }: { cfg: ApiConfig; categories: { id: number; name: string }[] }) {
   const year = new Date().getFullYear();
@@ -18,8 +19,8 @@ export function Footer({ cfg, categories }: { cfg: ApiConfig; categories: { id: 
           <div>
             <h3>تواصل معنا</h3>
             <ul>
-              {cfg.ecommerce_phone && <li><a href={`tel:${cfg.ecommerce_phone}`} className="num">{cfg.ecommerce_phone}</a></li>}
-              {cfg.ecommerce_email && <li><a href={`mailto:${cfg.ecommerce_email}`}>{cfg.ecommerce_email}</a></li>}
+              {CONTACT.phones.map((n) => <li key={n}><a href={telHref(n)} className="num">{n}</a></li>)}
+              <li><a href={`mailto:${CONTACT.email}`}>{CONTACT.email}</a></li>
               {cfg.ecommerce_address && <li>{cfg.ecommerce_address}</li>}
             </ul>
           </div>
