@@ -225,7 +225,7 @@ const en: Dict = {
   rights: (y: number) => `© ${y} Zabayeh Al Jazeera. All rights reserved.`,
   company: 'Themar Livestock & Sheep Trading L.L.C.',
   companyOf: 'Zabayeh Al Jazeera is a brand of',
-  address: 'Al Shamkha Automated Slaughterhouse, Old Al Shamkha, Al Shamkha, Abu Dhabi',
+  address: 'Al Shahama Automated Slaughterhouse, Old Al Shahama, Al Shahama, Abu Dhabi',
   whatsapp: 'Chat on WhatsApp',
   account: (n: string) => `My account: ${n}`,
   signIn: 'Sign in',
@@ -332,7 +332,7 @@ const en: Dict = {
   dateLocale: 'en-AE',
 
   area: 'Area',
-  areaPh: 'Search your area, e.g. Al Shamkha, Khalifa City',
+  areaPh: 'Search your area, e.g. Al Shahama, Khalifa City',
   useLocation: 'Use my current location',
   locating: 'Finding your location…',
   located: '✓ Location set',
